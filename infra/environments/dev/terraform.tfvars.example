@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (git-ignored).
+
+# Your public IP: curl -s https://checkip.amazonaws.com
+admin_cidrs = ["203.0.113.10/32"]
+
+# SPOT nodes cut node cost substantially for a lab (they can be reclaimed).
+node_capacity_type = "ON_DEMAND"
+
+# The GitHub OIDC provider was created by bootstrap/ in aws-secure-three-tier-platform.
+create_github_oidc_provider = false

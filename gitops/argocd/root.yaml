@@ -1,0 +1,23 @@
+# App of apps: the only thing applied by hand (scripts/bootstrap-cluster.sh).
+# Everything else in the cluster is declared under gitops/apps and reconciled
+# by Argo CD from the main branch.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Monkmode-tech/eks-devsecops-pipeline.git
+    targetRevision: main
+    path: gitops/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

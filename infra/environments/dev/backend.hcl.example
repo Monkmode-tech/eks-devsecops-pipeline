@@ -1,0 +1,5 @@
+bucket       = "tfstate-<ACCOUNT_ID>-us-east-2"
+key          = "eks-devsecops-pipeline/dev/terraform.tfstate"
+region       = "us-east-2"
+encrypt      = true
+use_lockfile = true

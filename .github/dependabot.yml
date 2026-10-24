@@ -1,0 +1,21 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: maven
+    directory: /services/catalog-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directories:
+      - /services/orders-api
+      - /services/catalog-service
+    schedule:
+      interval: weekly
+  - package-ecosystem: terraform
+    directories:
+      - /infra/environments/dev
+    schedule:
+      interval: monthly

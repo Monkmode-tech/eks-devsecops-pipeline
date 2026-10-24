@@ -1,0 +1,153 @@
+name: ci
+
+# Every pull request and push to main passes these gates. No cloud
+# credentials are used; a failing gate blocks the merge.
+#
+#   secrets      gitleaks over the full history
+#   test         unit tests + TypeScript type-check + Maven verify
+#   images       build both images, Trivy (fail on fixable HIGH/CRITICAL), SBOM
+#   dockerfile   hadolint
+#   iac          terraform fmt/validate, tflint, checkov (Terraform, K8s, Dockerfiles, Actions)
+#   manifests    kustomize build + kubeconform schema validation (incl. CRDs)
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets:
+    name: secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  orders-api:
+    name: orders-api tests + typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/orders-api
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm test
+      - run: npm run typecheck
+
+  catalog-service:
+    name: catalog-service tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/catalog-service
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn -B -ntp verify
+
+  images:
+    name: image build + Trivy + SBOM (${{ matrix.service }})
+    needs: [orders-api, catalog-service]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [orders-api, catalog-service]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          load: true
+          tags: ${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+      - name: Trivy vulnerability scan (gate)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ matrix.service }}:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+      - name: SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ matrix.service }}:ci
+          format: spdx-json
+          artifact-name: sbom-${{ matrix.service }}.spdx.json
+
+  dockerfile:
+    name: hadolint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [orders-api, catalog-service]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: services/${{ matrix.service }}/Dockerfile
+          config: .hadolint.yaml
+
+  iac:
+    name: terraform + checkov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "~1.13"
+      - run: terraform fmt -check -recursive -diff infra
+      - run: terraform init -backend=false -input=false
+        working-directory: infra/environments/dev
+      - run: terraform validate -no-color
+        working-directory: infra/environments/dev
+      - uses: terraform-linters/setup-tflint@v6
+      - run: tflint --init && tflint --recursive --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+        working-directory: infra
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform,kubernetes,dockerfile,github_actions
+          config_file: .checkov.yaml
+
+  manifests:
+    name: kustomize + kubeconform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Render the dev overlay
+        run: kubectl kustomize k8s/overlays/dev > rendered.yaml
+      - name: Validate application manifests (strict)
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary rendered.yaml
+      - name: Validate GitOps manifests against CRD schemas
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ghcr.io/yannh/kubeconform:v0.6.7 \
+            -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            gitops/

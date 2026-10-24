@@ -1,0 +1,14 @@
+# dev overlay. The release workflow rewrites the image entries below with the
+# ECR repository and the immutable digest of every image it builds, scans and
+# signs - Argo CD then rolls that exact artifact out.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: orders-api
+    newName: 000000000000.dkr.ecr.us-east-2.amazonaws.com/devsecops/orders-api
+    newTag: unreleased
+  - name: catalog-service
+    newName: 000000000000.dkr.ecr.us-east-2.amazonaws.com/devsecops/catalog-service
+    newTag: unreleased

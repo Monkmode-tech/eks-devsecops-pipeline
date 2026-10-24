@@ -1,0 +1,205 @@
+# Grafana picks this up through its dashboard sidecar (label grafana_dashboard).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shop-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  shop-dashboard.json: |
+    {
+      "title": "Shop - orders-api and catalog-service",
+      "uid": "shop-golden-signals",
+      "schemaVersion": 39,
+      "version": 1,
+      "time": {
+        "from": "now-1h",
+        "to": "now"
+      },
+      "refresh": "30s",
+      "tags": [
+        "shop",
+        "golden-signals"
+      ],
+      "templating": {
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "label": "Data source"
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "orders-api request rate by route and status",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (route, status) (rate(http_requests_total{namespace=\"shop\"}[5m]))",
+              "legendFormat": "{{route}} {{status}}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "orders-api p95 latency",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket{namespace=\"shop\"}[5m])))",
+              "legendFormat": "{{route}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "orders-api error ratio (5xx)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(http_requests_total{namespace=\"shop\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_requests_total{namespace=\"shop\"}[5m])), 1e-9)",
+              "legendFormat": "5xx ratio"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Orders created per minute",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 8,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum(rate(orders_created_total{namespace=\"shop\"}[5m])) * 60",
+              "legendFormat": "orders/min"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "catalog-service request rate (Spring / Micrometer)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (uri, status) (rate(http_server_requests_seconds_count{namespace=\"shop\"}[5m]))",
+              "legendFormat": "{{uri}} {{status}}"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Pod CPU vs requests (HPA input)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 16,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"shop\",container!=\"\"}[5m]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,16 @@
+{
+  "name": "orders-api",
+  "version": "1.0.0",
+  "description": "Orders microservice - TypeScript on Node.js 24 with zero runtime dependencies",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "npm install --no-save --no-package-lock --ignore-scripts typescript@5.9 @types/node@24 && npx tsc --noEmit -p ."
+  },
+  "license": "MIT"
+}

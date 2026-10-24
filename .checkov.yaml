@@ -1,0 +1,16 @@
+# Checkov scans Terraform, Kubernetes manifests, Dockerfiles and GitHub
+# Actions workflows. Repo-wide skips are documented decisions; resource-level
+# exceptions are inline comments/annotations next to the code.
+compact: true
+quiet: true
+skip-path:
+  - .terraform
+skip-check:
+  # KMS key policy uses "*" for the key itself; access is scoped by principal and condition.
+  - CKV_AWS_109
+  - CKV_AWS_111
+  - CKV_AWS_356
+  # 30-day log retention keeps a short-lived lab inside its budget.
+  - CKV_AWS_338
+  # State locking is set in backend.hcl (use_lockfile = true), not in code.
+  - CKV_TF_3

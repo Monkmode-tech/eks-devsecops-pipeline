@@ -1,0 +1,3 @@
+failure-threshold: warning
+# No rules are ignored: both Dockerfiles are expected to pass cleanly.
+ignored: []

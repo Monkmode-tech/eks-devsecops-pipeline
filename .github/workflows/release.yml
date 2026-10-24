@@ -1,0 +1,120 @@
+name: release
+
+# On every merge to main that touches a service:
+#   1. build the image and push it to ECR (OIDC role, no stored keys)
+#   2. Trivy-scan the pushed image again (gate)
+#   3. sign it keyless with Sigstore cosign and attach an SPDX SBOM attestation
+#   4. pin the new digest in k8s/overlays/dev - Argo CD deploys that commit
+#
+# Disabled until repository variables AWS_ECR_PUSH_ROLE_ARN, AWS_REGION and
+# ECR_REGISTRY exist (values come from `terraform output`).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build-scan-sign:
+    if: ${{ vars.AWS_ECR_PUSH_ROLE_ARN != '' }}
+    name: ${{ matrix.service }}
+    # Native arm64 runner: the nodes are Graviton, so no QEMU emulation needed.
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS and to Sigstore (keyless signing)
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [orders-api, catalog-service]
+    env:
+      IMAGE: ${{ vars.ECR_REGISTRY }}/devsecops/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: services/${{ matrix.service }}
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Trivy scan of the pushed image (gate)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign (keyless, identity = this workflow on main)
+        run: cosign sign --yes "${IMAGE}@${{ steps.push.outputs.digest }}"
+
+      - name: Generate and attest SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          artifact-name: sbom-${{ matrix.service }}.spdx.json
+      - run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "${IMAGE}@${{ steps.push.outputs.digest }}"
+
+      - name: Record digest for promotion
+        run: echo "${{ steps.push.outputs.digest }}" > digest-${{ matrix.service }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.service }}
+          path: digest-${{ matrix.service }}.txt
+
+  promote:
+    name: pin digests in the dev overlay (GitOps)
+    needs: build-scan-sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+      - name: Update kustomization images
+        env:
+          REGISTRY: ${{ vars.ECR_REGISTRY }}
+        run: |
+          for svc in orders-api catalog-service; do
+            digest="$(cat "digest-${svc}.txt")"
+            SVC="$svc" NAME="${REGISTRY}/devsecops/${svc}" DIGEST="$digest" yq -i '
+              (.images[] | select(.name == env(SVC))) |= (.newName = env(NAME) | .digest = env(DIGEST) | del(.newTag))
+            ' k8s/overlays/dev/kustomization.yaml
+          done
+          git diff
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/overlays/dev/kustomization.yaml
+          git commit -m "deploy(dev): pin signed images from ${GITHUB_SHA::7} [skip ci]" || echo "nothing to change"
+          git push

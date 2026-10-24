@@ -1,0 +1,27 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+crash.log
+*.tfvars
+!*.tfvars.example
+backend.hcl
+
+# Builds
+node_modules/
+target/
+rendered.yaml
+sbom*.json
+digest-*.txt
+
+# Secrets
+*.pem
+*.key
+.env
+.env.*
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

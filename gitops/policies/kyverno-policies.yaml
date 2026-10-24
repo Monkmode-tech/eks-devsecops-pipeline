@@ -1,0 +1,126 @@
+# Admission-time guardrails for the shop namespace. Pod Security Admission
+# (restricted) already blocks privileged and root containers; Kyverno adds the
+# supply-chain rules that PSA cannot express.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow mutable image tags
+    policies.kyverno.io/description: Images must be pinned to a tag other than latest (the dev overlay pins digests).
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+              namespaces: ["shop"]
+      validate:
+        message: "An image tag or digest is required."
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"
+    - name: disallow-latest
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+              namespaces: ["shop"]
+      validate:
+        message: "The ':latest' tag is mutable and not allowed."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-image-registries
+  annotations:
+    policies.kyverno.io/title: Only this project's ECR repositories
+    policies.kyverno.io/description: Blocks images pulled from public registries or other accounts' repositories.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ecr-only
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+              namespaces: ["shop"]
+      validate:
+        message: "Images must come from this project's ECR repositories (*.dkr.ecr.*.amazonaws.com/devsecops/*)."
+        pattern:
+          spec:
+            containers:
+              - image: "*.dkr.ecr.*.amazonaws.com/devsecops/*"
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-requests-limits
+  annotations:
+    policies.kyverno.io/title: Require CPU and memory requests and a memory limit
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: resources
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+              namespaces: ["shop"]
+      validate:
+        message: "Every container needs CPU/memory requests and a memory limit."
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    memory: "?*"
+---
+# Supply-chain gate: only images signed (keyless, via Sigstore) by this
+# repository's release workflow on main may run. Starts in Audit mode; switch
+# to Enforce after the first signed release is deployed (docs/supply-chain.md).
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify cosign keyless signatures
+spec:
+  validationFailureAction: Audit
+  webhookTimeoutSeconds: 30
+  background: false
+  rules:
+    - name: signed-by-release-workflow
+      match:
+        any:
+          - resources:
+              kinds: ["Pod"]
+              namespaces: ["shop"]
+      verifyImages:
+        - imageReferences:
+            - "*.dkr.ecr.*.amazonaws.com/devsecops/*"
+          mutateDigest: true
+          verifyDigest: true
+          required: true
+          imageRegistryCredentials:
+            providers: ["amazon"]
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "https://github.com/Monkmode-tech/eks-devsecops-pipeline/.github/workflows/release.yml@refs/heads/main"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev

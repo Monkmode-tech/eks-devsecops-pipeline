@@ -1,0 +1,28 @@
+# Run both services locally without AWS:
+#   docker compose up --build
+#   curl -s -X POST localhost:3000/orders -H 'content-type: application/json' \
+#        -d '{"productId":"p-100","quantity":2}'
+services:
+  catalog-service:
+    build: ./services/catalog-service
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+
+  orders-api:
+    build: ./services/orders-api
+    environment:
+      CATALOG_URL: http://catalog-service:8080
+    ports:
+      - "3000:3000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: ["ALL"]
+    depends_on:
+      - catalog-service
