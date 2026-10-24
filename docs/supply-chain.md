@@ -50,7 +50,12 @@ signed image exists) isn't blocked. After the first release:
 - **orders-api has zero third-party runtime dependencies.** TypeScript runs
   natively on Node.js 24 (type stripping), so there's no `node_modules` in the
   image to carry vulnerabilities ([ADR 0001](adr/0001-zero-dependency-typescript-service.md)).
+- **No package managers at runtime.** The orders-api image deletes npm, npx, corepack and yarn.
+  The first Trivy gate run found HIGH CVEs (undici, brace-expansion) only in the *bundled npm*,
+  code the service never runs. Removing it beats suppressing the findings.
 - **catalog-service** ships a JRE-only runtime image; Maven and the JDK stay in the build stage.
+  When the gate flagged Jackson 2.19.0, the fix was Spring Boot 3.5.16 plus a pinned
+  `jackson-bom` patch (2.21.7), not an ignore rule.
 - Both run as UID 10001 with a read-only root filesystem and no Linux capabilities.
 
 ## Pinning the pipeline's own tools

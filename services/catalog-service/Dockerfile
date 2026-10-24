@@ -9,6 +9,9 @@ COPY src ./src
 RUN mvn -B -ntp package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
+# Apply Alpine security fixes released after the base image was built.
+# hadolint ignore=DL3017
+RUN apk upgrade --no-cache
 WORKDIR /app
 COPY --from=build /src/target/catalog-service.jar /app/app.jar
 
