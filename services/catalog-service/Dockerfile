@@ -1,7 +1,7 @@
 # catalog-service: multi-stage build. The JDK and Maven exist only in the build
 # stage; the runtime image is a JRE with the single application jar.
 
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /src
 COPY pom.xml .
 RUN mvn -B -ntp dependency:go-offline
