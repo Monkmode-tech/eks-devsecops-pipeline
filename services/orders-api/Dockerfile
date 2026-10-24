@@ -2,7 +2,7 @@
 # No npm install at all - the service has zero third-party runtime dependencies,
 # so the image contains only Node.js and our source code.
 
-FROM node:24-alpine
+FROM node:25-alpine
 
 ENV NODE_ENV=production \
     PORT=3000
