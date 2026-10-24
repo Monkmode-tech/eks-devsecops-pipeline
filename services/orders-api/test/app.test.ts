@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
-import { createApp, validateOrderInput } from "../src/app.ts";
+import { createApp, type Order, validateOrderInput } from "../src/app.ts";
 import { createCatalogClient, type CatalogClient, type LookupResult } from "../src/catalog-client.ts";
 
 const products: Record<string, LookupResult> = {
@@ -62,13 +62,13 @@ describe("POST /orders", () => {
   it("creates an order priced from the catalog", async () => {
     const res = await post({ productId: "p-100", quantity: 3 });
     assert.equal(res.status, 201);
-    const order = await res.json();
+    const order = (await res.json()) as Order;
     assert.equal(order.unitPriceCents, 4999);
     assert.equal(order.totalCents, 14997);
     assert.match(order.id, /^[0-9a-f-]{36}$/);
 
-    const list = await (await fetch(`${base}/orders`)).json();
-    assert.ok(list.orders.some((o: { id: string }) => o.id === order.id));
+    const list = (await (await fetch(`${base}/orders`)).json()) as { orders: Order[] };
+    assert.ok(list.orders.some((o) => o.id === order.id));
   });
 
   it("returns 404 for unknown products", async () => {
@@ -89,7 +89,7 @@ describe("POST /orders", () => {
     for (const bad of [{ productId: "P_100", quantity: 1 }, { productId: "p-100", quantity: 0 }, { quantity: 2 }, [1, 2]]) {
       const res = await post(bad);
       assert.equal(res.status, 400, JSON.stringify(bad));
-      const body = await res.json();
+      const body = (await res.json()) as Record<string, unknown>;
       assert.ok(!("stack" in body));
     }
   });
@@ -130,7 +130,7 @@ describe("catalog client", () => {
 
     const slow = createCatalogClient("http://x", 20, (_url, init) =>
       new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        init?.signal?.addEventListener("abort", () => reject(init?.signal?.reason));
       }));
     assert.deepEqual(await slow.getProduct("a"), { kind: "unavailable", reason: "catalog timed out" });
   });

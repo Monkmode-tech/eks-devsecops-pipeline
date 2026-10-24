@@ -61,6 +61,9 @@ resource "aws_iam_role_policy" "cluster_kms" {
 }
 
 resource "aws_eks_cluster" "this" {
+  # checkov:skip=CKV_AWS_38: Public endpoint is limited to var.admin_cidrs, and a validation rejects 0.0.0.0/0
+  # checkov:skip=CKV_AWS_39: Public endpoint kept (admin-IP only) so the cluster can be managed without a VPN; private access is also on
+  # checkov:skip=CKV_AWS_339: 1.36 is in EKS standard support until Aug 2027; the checkov version list lags new releases
   name                      = var.name
   version                   = var.kubernetes_version
   role_arn                  = aws_iam_role.cluster.arn

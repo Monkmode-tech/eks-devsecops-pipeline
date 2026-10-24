@@ -8,12 +8,20 @@ updates:
     directory: /services/catalog-service
     schedule:
       interval: weekly
+    # Major framework upgrades (e.g. Spring Boot 4) are planned deliberately.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directories:
       - /services/orders-api
       - /services/catalog-service
     schedule:
       interval: weekly
+    # Stay on LTS runtimes (Node 24, Java 21); majors are upgraded deliberately.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: terraform
     directories:
       - /infra/environments/dev

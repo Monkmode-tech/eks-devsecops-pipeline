@@ -55,12 +55,20 @@ jobs:
         working-directory: services/catalog-service
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
-      - run: mvn -B -ntp verify
+      - name: mvn verify
+        run: |
+          set -o pipefail
+          mvn -B -ntp verify 2>&1 | tee mvn.log
+      - name: Surface build and test failures as annotations
+        if: failure()
+        run: |
+          grep -E '^\[ERROR\]' mvn.log | grep -v -E 'Re-run Maven|^\[ERROR\] *$|-> \[Help' | head -9 | sed 's/^/::error::/' || true
+          cat target/surefire-reports/*.txt 2>/dev/null | grep -E 'FAIL|Exception|expected' | head -9 | sed 's/^/::error title=surefire::/' || true
 
   images:
     name: image build + Trivy + SBOM (${{ matrix.service }})
@@ -72,7 +80,7 @@ jobs:
         service: [orders-api, catalog-service]
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       - name: Build image
         uses: docker/build-push-action@v6
         with:
@@ -104,7 +112,7 @@ jobs:
         service: [orders-api, catalog-service]
     steps:
       - uses: actions/checkout@v7
-      - uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@v3.5.0
         with:
           dockerfile: services/${{ matrix.service }}/Dockerfile
           config: .hadolint.yaml
