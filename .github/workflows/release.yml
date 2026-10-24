@@ -60,7 +60,7 @@ jobs:
           tags: ${{ env.IMAGE }}:${{ github.sha }}
 
       - name: Trivy scan of the pushed image (gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0 - SHA-pinned, see docs/supply-chain.md
         with:
           image-ref: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
           severity: CRITICAL,HIGH

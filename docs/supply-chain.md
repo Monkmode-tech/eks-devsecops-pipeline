@@ -52,3 +52,21 @@ signed image exists) isn't blocked. After the first release:
   image to carry vulnerabilities ([ADR 0001](adr/0001-zero-dependency-typescript-service.md)).
 - **catalog-service** ships a JRE-only runtime image; Maven and the JDK stay in the build stage.
 - Both run as UID 10001 with a read-only root filesystem and no Linux capabilities.
+
+## Pinning the pipeline's own tools
+
+The pipeline is part of the supply chain too. In March 2026, attackers force-pushed
+about 75 of the 76 version tags of `aquasecurity/trivy-action` to malicious commits that stole
+CI secrets ([Aqua's advisory](https://www.aquasec.com/blog/trivy-supply-chain-attack-what-you-need-to-know),
+CVE-2026-33634). Any workflow that used `trivy-action@<tag>` ran the attacker's code.
+
+So the scanner is pinned to a **full commit SHA**, which cannot be moved, with the version in a comment:
+
+```yaml
+uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+```
+
+v0.36.0 is a post-incident release (April 2026) that installs Trivy v0.70.0, also post-incident.
+Dependabot still proposes updates to SHA-pinned actions, so pinning doesn't mean falling behind.
+Other actions are first-party (`actions/*`, `docker/*`, `aws-actions/*`) and use major-version
+tags. Moving them to SHAs too is the next hardening step.
