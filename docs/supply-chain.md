@@ -67,6 +67,8 @@ uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36
 ```
 
 v0.36.0 is a post-incident release (April 2026) that installs Trivy v0.70.0, also post-incident.
-Dependabot still proposes updates to SHA-pinned actions, so pinning doesn't mean falling behind.
-Other actions are first-party (`actions/*`, `docker/*`, `aws-actions/*`) and use major-version
-tags. Moving them to SHAs too is the next hardening step.
+
+The same rule applies to **every action not owned by GitHub** (Anchore, AWS, Bridgecrew, Docker,
+Gitleaks, Hadolint, HashiCorp, Sigstore, TFLint): each is pinned to a commit SHA with its version in
+a comment. Only `actions/*` and `github/*` use version tags. Dependabot understands the
+`@<sha> # <version>` form and still proposes updates, so pinning doesn't mean falling behind.
