@@ -8,11 +8,9 @@ ENV NODE_ENV=production \
     PORT=3000
 
 # The runtime needs only the node binary. Remove the bundled package managers
-# (npm, npx, corepack, yarn) - unused here, and the source of most CVEs Trivy
-# finds in Node images - and apply Alpine security fixes newer than the base tag.
-# hadolint ignore=DL3017
-RUN apk upgrade --no-cache \
- && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+# (npm, npx, corepack, yarn): unused here, and the source of the CVEs Trivy
+# found in this image.
+RUN rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
            /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-*
 
 WORKDIR /app

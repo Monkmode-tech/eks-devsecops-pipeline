@@ -54,8 +54,9 @@ signed image exists) isn't blocked. After the first release:
   The first Trivy gate run found HIGH CVEs (undici, brace-expansion) only in the *bundled npm*,
   code the service never runs. Removing it beats suppressing the findings.
 - **catalog-service** ships a JRE-only runtime image; Maven and the JDK stay in the build stage.
-  When the gate flagged Jackson 2.19.0, the fix was Spring Boot 3.5.16 plus a pinned
-  `jackson-bom` patch (2.21.7), not an ignore rule.
+  When the gate flagged Jackson, Tomcat and spring-webmvc, the spring-webmvc fix existed only
+  in Spring Framework 7. The Spring Boot 3.5 line no longer got open-source patches for it.
+  So the service moved to **Spring Boot 4.0** instead of adding an ignore rule.
 - Both run as UID 10001 with a read-only root filesystem and no Linux capabilities.
 
 ## Pinning the pipeline's own tools

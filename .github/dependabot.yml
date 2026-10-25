@@ -8,7 +8,7 @@ updates:
     directory: /services/catalog-service
     schedule:
       interval: weekly
-    # Major framework upgrades (e.g. Spring Boot 4) are planned deliberately.
+    # Major framework upgrades (e.g. Spring Boot 5) are planned deliberately.
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]

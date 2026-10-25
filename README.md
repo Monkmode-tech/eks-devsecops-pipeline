@@ -51,7 +51,7 @@ engineering: building security into the delivery process instead of bolting it o
 
 ## Technical summary
 
-- **Services:** `orders-api` (TypeScript on Node.js 24 via native type stripping, **zero runtime dependencies**, hand-rolled Prometheus metrics, timeouts, input limits, security headers) calls `catalog-service` (Spring Boot 3.5, Java 21, Actuator probes + Micrometer)
+- **Services:** `orders-api` (TypeScript on Node.js 24 via native type stripping, **zero runtime dependencies**, hand-rolled Prometheus metrics, timeouts, input limits, security headers) calls `catalog-service` (Spring Boot 4.0, Java 21, Actuator probes + Micrometer)
 - **CI gates:** gitleaks, unit tests (14 TS + 5 Java) and `tsc`, CodeQL (security-extended), Trivy image gate on fixable HIGH/CRITICAL, Syft SBOM, hadolint, checkov (Terraform + K8s + Dockerfile + Actions), tflint, kubeconform
 - **Release:** GitHub OIDC → ECR (immutable, scan-on-push, KMS) on native arm64 runners → Trivy re-scan → **cosign keyless signing + SPDX SBOM attestation** → digest pinned in Git
 - **Platform (Terraform):** EKS 1.36 with access entries, KMS secrets encryption, all control-plane logs, public endpoint restricted to an admin CIDR, `STANDARD` upgrade policy; Graviton managed nodes with IMDSv2 hop limit 1; VPC CNI network policy enforcement; metrics-server; EKS Pod Identity
@@ -100,6 +100,20 @@ cd infra/environments/dev && terraform init -backend-config=backend.hcl && terra
 ```
 
 Full steps: [docs/runbook.md](docs/runbook.md)
+
+## Where to look
+
+| Skill | Evidence |
+|---|---|
+| CI/CD quality and security gates (tests, typecheck, IaC scan, secrets, image CVEs, SBOM) | [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [docs/pipeline.md](docs/pipeline.md) |
+| Software supply-chain security (keyless signing, attestations, SHA-pinned actions) | [`.github/workflows/release.yml`](.github/workflows/release.yml), [docs/supply-chain.md](docs/supply-chain.md), [ADR 0003](docs/adr/0003-keyless-signing-and-admission-verification.md) |
+| Fixing vulnerabilities rather than suppressing them (Spring Boot 4 upgrade, npm removed from runtime) | [docs/supply-chain.md](docs/supply-chain.md#minimal-attack-surface-by-design) |
+| Kubernetes on EKS with Terraform (access entries, Pod Identity, KMS secrets, IMDSv2) | [`infra/modules/eks`](infra/modules/eks/main.tf) |
+| GitOps with Argo CD (pull-based, app-of-apps, sync waves) | [`gitops/`](gitops), [ADR 0002](docs/adr/0002-gitops-pull-based-deploys.md) |
+| Policy as code and pod hardening (Kyverno, Pod Security "restricted", NetworkPolicies) | [`gitops/policies`](gitops/policies/kyverno-policies.yaml), [`k8s/base`](k8s/base), [ADR 0004](docs/adr/0004-defense-in-depth-for-pods.md) |
+| Observability (Prometheus metrics, ServiceMonitors, Grafana dashboard) | [`gitops/monitoring`](gitops/monitoring) |
+| Two languages, production-style services (TypeScript, Java/Spring) | [`services/`](services), [ADR 0001](docs/adr/0001-zero-dependency-typescript-service.md) |
+| Operations and cost | [docs/runbook.md](docs/runbook.md), [docs/cost.md](docs/cost.md) |
 
 ## Repository layout
 
