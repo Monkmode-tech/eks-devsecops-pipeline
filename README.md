@@ -153,7 +153,7 @@ docs/                       architecture, pipeline, supply chain, runbook, cost,
 
 ## Background
 
-Built by **Caleb Tetteh** (M.S. Cloud Computing Systems, UMGC; B.S. Computer
+Built by **Caleb Tetteh** (M.S. Cloud Computing, UMGC; B.S. Computer
 Science, Georgia Tech; software engineer building Node.js/Java microservices on
 AWS at Verizon). It extends the CLCS 615 modernization projects (decomposing a
 monolith into EKS-ready microservices, monitoring and auto-scaling strategy) and
