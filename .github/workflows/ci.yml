@@ -143,7 +143,7 @@ jobs:
         working-directory: infra
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - uses: bridgecrewio/checkov-action@c3e106d5f8f4253a6de5110efb41a080f83db294 # v12
+      - uses: bridgecrewio/checkov-action@c10e2438743528f9e4549758fad8b7a62052541d # v12
         with:
           directory: .
           framework: terraform,kubernetes,dockerfile,github_actions
